@@ -458,11 +458,8 @@ void NativeWindowMac::SetContentView(views::View* view) {
   set_content_view(view);
   root_view->AddChildView(content_view());
 
-  if (buttons_view_) {
-    // Ensure the buttons view are always floated on the top.
-    [buttons_view_ removeFromSuperview];
-    [[window_ contentView] addSubview:buttons_view_];
-  }
+  if (buttons_view_)
+    ReorderButtonsView();
 
   root_view->Layout();
 }
@@ -1143,6 +1140,8 @@ void NativeWindowMac::AddBrowserView(NativeBrowserView* view) {
   }
 
   [CATransaction commit];
+
+  ReorderButtonsView();
 }
 
 void NativeWindowMac::RemoveBrowserView(NativeBrowserView* view) {
@@ -1184,6 +1183,8 @@ void NativeWindowMac::SetTopBrowserView(NativeBrowserView* view) {
   }
 
   [CATransaction commit];
+
+  ReorderButtonsView();
 }
 
 void NativeWindowMac::SetParentWindow(NativeWindow* parent) {
@@ -1352,8 +1353,6 @@ void NativeWindowMac::SetVibrancy(const std::string& type) {
     return;
   }
 
-  vibrancy_type_ = type;
-
   NSVisualEffectView* effect_view = (NSVisualEffectView*)vibrant_view;
   if (effect_view == nil) {
     effect_view = [[[NSVisualEffectView alloc]
@@ -1382,7 +1381,7 @@ void NativeWindowMac::SetVibrancy(const std::string& type) {
   node::Environment* env =
       node::Environment::GetCurrent(JavascriptEnvironment::GetIsolate());
 
-  NSVisualEffectMaterial vibrancyType;
+  NSVisualEffectMaterial vibrancyType{};
   if (type == "appearance-based") {
     EmitWarning(env, "NSVisualEffectMaterialAppearanceBased" + dep_warn,
                 "electron");
@@ -1439,8 +1438,10 @@ void NativeWindowMac::SetVibrancy(const std::string& type) {
     }
   }
 
-  if (vibrancyType)
+  if (vibrancyType) {
+    vibrancy_type_ = type;
     [effect_view setMaterial:vibrancyType];
+  }
 }
 
 void NativeWindowMac::SetWindowButtonVisibility(bool visible) {
@@ -1461,7 +1462,7 @@ void NativeWindowMac::SetTrafficLightPosition(
     base::Optional<gfx::Point> position) {
   traffic_light_position_ = std::move(position);
   if (buttons_view_) {
-    [buttons_view_ setMargin:position];
+    [buttons_view_ setMargin:traffic_light_position_];
     [buttons_view_ viewDidMoveToWindow];
   }
 }
@@ -1644,6 +1645,13 @@ void NativeWindowMac::SetActive(bool is_key) {
 
 bool NativeWindowMac::IsActive() const {
   return is_active_;
+}
+
+void NativeWindowMac::ReorderButtonsView() {
+  if (buttons_view_) {
+    [buttons_view_ removeFromSuperview];
+    [[window_ contentView] addSubview:buttons_view_];
+  }
 }
 
 void NativeWindowMac::Cleanup() {
